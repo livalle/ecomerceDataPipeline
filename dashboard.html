@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Análise de Receita e Margem — E-Commerce Pipeline</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0d1b3e;
+    --bg2: #112050;
+    --bg3: #162660;
+    --card-blue: linear-gradient(135deg, #1565c0 0%, #0d47a1 100%);
+    --card-teal: linear-gradient(135deg, #00695c 0%, #004d40 100%);
+    --card-pink: linear-gradient(135deg, #ad1457 0%, #880e4f 100%);
+    --accent: #29b6f6;
+    --text: #e8eaf6;
+    --muted: #90a4d4;
+    --green: #00e676;
+    --amber: #ffca28;
+    --coral: #ff7043;
+    --border: rgba(255,255,255,0.08);
+    --radius: 12px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 0;
+  }
+
+  /* ── Header ── */
+  .header {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .header h1 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #fff;
+    letter-spacing: .3px;
+  }
+  .filters {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .filters select {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 6px 28px 6px 10px;
+    font-size: 13px;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2390a4d4' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    min-width: 120px;
+  }
+
+  /* ── Main layout ── */
+  .main { padding: 20px 24px; display: flex; flex-direction: column; gap: 20px; }
+
+  /* ── KPI Cards ── */
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+  .kpi-card {
+    border-radius: var(--radius);
+    padding: 18px 20px 12px;
+    position: relative;
+    overflow: hidden;
+    min-height: 160px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .kpi-card.blue { background: var(--card-blue); }
+  .kpi-card.teal { background: var(--card-teal); }
+  .kpi-card.pink { background: var(--card-pink); }
+
+  .kpi-icon {
+    position: absolute;
+    top: 14px;
+    right: 16px;
+    font-size: 36px;
+    opacity: 0.3;
+  }
+  .kpi-label {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    opacity: .85;
+    margin-bottom: 6px;
+  }
+  .kpi-value {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -.5px;
+    color: #fff;
+  }
+  .kpi-best {
+    font-size: 11px;
+    opacity: .75;
+    margin-top: 4px;
+  }
+  .kpi-best span { font-weight: 600; color: #fff; }
+  .kpi-sparkline { margin-top: 10px; height: 48px; }
+
+  /* ── Bottom row ── */
+  .bottom-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  /* ── Table card ── */
+  .table-card {
+    background: var(--bg2);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    padding: 18px;
+    overflow: hidden;
+  }
+  .card-title {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 14px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .8px;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th {
+    text-align: left;
+    padding: 6px 8px;
+    color: var(--muted);
+    font-weight: 500;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .6px;
+    border-bottom: 1px solid var(--border);
+  }
+  thead th:not(:first-child) { text-align: right; }
+  tbody tr { border-bottom: 1px solid rgba(255,255,255,0.04); }
+  tbody tr:hover { background: rgba(255,255,255,0.04); }
+  tbody tr:last-child { border-bottom: none; font-weight: 600; color: #fff; }
+  tbody td { padding: 9px 8px; color: var(--text); }
+  tbody td:not(:first-child) { text-align: right; }
+
+  .check { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+
+  .bar-mini {
+    display: inline-block;
+    height: 8px;
+    border-radius: 2px;
+    vertical-align: middle;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .badge-green  { background: rgba(0,230,118,.15); color: var(--green); }
+  .badge-amber  { background: rgba(255,202,40,.15); color: var(--amber); }
+  .badge-coral  { background: rgba(255,112,67,.15); color: var(--coral); }
+
+  /* ── Bar chart card ── */
+  .chart-card {
+    background: var(--bg2);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    padding: 18px;
+  }
+  .chart-legend {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 14px;
+    font-size: 12px;
+  }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 5px; vertical-align: middle; }
+
+  /* ── Responsive ── */
+  @media (max-width: 900px) {
+    .kpi-row { grid-template-columns: 1fr; }
+    .bottom-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <h1>Análise de Receita e Margem</h1>
+  <div class="filters">
+    <select id="filter-month" onchange="applyFilters()">
+      <option value="all">Mês: Todos</option>
+      <option value="1">Janeiro</option><option value="2">Fevereiro</option>
+      <option value="3">Março</option><option value="4">Abril</option>
+      <option value="5">Maio</option><option value="6">Junho</option>
+      <option value="7">Julho</option><option value="8">Agosto</option>
+      <option value="9">Setembro</option><option value="10">Outubro</option>
+      <option value="11">Novembro</option><option value="12">Dezembro</option>
+    </select>
+    <select id="filter-channel" onchange="applyFilters()">
+      <option value="all">Canal: Todos</option>
+      <option value="Varejo">Varejo</option>
+      <option value="Distribuidoras">Distribuidoras</option>
+      <option value="Online">Online</option>
+    </select>
+    <select id="filter-supplier" onchange="applyFilters()">
+      <option value="all">Fornecedor: Todos</option>
+      <option value="Moinho Dois Irmãos">Moinho Dois Irmãos</option>
+      <option value="Santa Rosa Alimentos">Santa Rosa Alimentos</option>
+      <option value="Kappa Bebidas">Kappa Bebidas</option>
+      <option value="King Coffee">King Coffee</option>
+      <option value="Atacado Doces">Atacado Doces</option>
+    </select>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- KPI CARDS -->
+  <div class="kpi-row">
+    <div class="kpi-card blue">
+      <div>
+        <div class="kpi-label">Receita Operacional</div>
+        <div class="kpi-value" id="kpi-revenue">R$9.681.527</div>
+        <div class="kpi-best">Melhor mês: novembro &nbsp;<span id="kpi-rev-best">R$1.189.150</span></div>
+      </div>
+      <div class="kpi-icon">📊</div>
+      <div class="kpi-sparkline"><canvas id="spark-revenue"></canvas></div>
+    </div>
+    <div class="kpi-card teal">
+      <div>
+        <div class="kpi-label">Margem de Contribuição</div>
+        <div class="kpi-value" id="kpi-margin">R$2.061.909</div>
+        <div class="kpi-best">Melhor mês: novembro &nbsp;<span id="kpi-mar-best">R$255.943</span></div>
+      </div>
+      <div class="kpi-icon">🥧</div>
+      <div class="kpi-sparkline"><canvas id="spark-margin"></canvas></div>
+    </div>
+    <div class="kpi-card pink">
+      <div>
+        <div class="kpi-label">% MC Geral</div>
+        <div class="kpi-value" id="kpi-pct">21%</div>
+        <div class="kpi-best">Melhor mês: janeiro &nbsp;<span id="kpi-pct-best">22%</span></div>
+      </div>
+      <div class="kpi-icon">%</div>
+      <div class="kpi-sparkline"><canvas id="spark-pct"></canvas></div>
+    </div>
+  </div>
+
+  <!-- BOTTOM ROW -->
+  <div class="bottom-row">
+
+    <!-- SUPPLIER TABLE -->
+    <div class="table-card">
+      <div class="card-title">Fornecedor</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Fornecedor</th>
+            <th>Receita Op.</th>
+            <th>Margem</th>
+            <th>% MC</th>
+          </tr>
+        </thead>
+        <tbody id="supplier-tbody">
+        </tbody>
+      </table>
+    </div>
+
+    <!-- CHANNEL BAR CHART -->
+    <div class="chart-card">
+      <div class="card-title">Receita por Canal e Linha de Produto</div>
+      <div class="chart-legend">
+        <span><span class="legend-dot" style="background:#1e88e5"></span>Alimentos</span>
+        <span><span class="legend-dot" style="background:#00acc1"></span>Bebidas</span>
+      </div>
+      <canvas id="channel-chart" height="200"></canvas>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── Mock dataset (replace with Snowflake/API fetch in prod) ────────────────
+const MONTHS = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+
+const monthlyRevenue = [620000,580000,710000,750000,820000,880000,930000,970000,1050000,1100000,1189150,1081377];
+const monthlyMargin  = [136400,127600,156200,165000,180400,193600,204600,213400,231000,242000,255943,255755];
+const monthlyPct     = [22,22,22,22,22,22,22,22,22,22,21.5,23.7];
+
+const supplierData = [
+  { name:'Moinho Dois Irmãos', revenue:5124316, margin:869986, pct:17, color:'#1e88e5' },
+  { name:'Santa Rosa Alimentos', revenue:2344964, margin:548185, pct:23, color:'#43a047' },
+  { name:'Kappa Bebidas', revenue:878548, margin:319229, pct:36, color:'#00acc1' },
+  { name:'King Coffee', revenue:857316, margin:192913, pct:23, color:'#8e24aa' },
+  { name:'Atacado Doces', revenue:476384, margin:131596, pct:28, color:'#fb8c00' },
+];
+
+const channelData = {
+  labels: ['Varejo','Distribuidoras','Online'],
+  alimentos: [3900000, 3000000, 2000000],
+  bebidas:   [600000,  0,       0],
+};
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function fmt(n) {
+  if (n >= 1e6) return 'R$' + (n/1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return 'R$' + Math.round(n/1e3) + 'K';
+  return 'R$' + Math.round(n).toLocaleString('pt-BR');
+}
+function fmtFull(n) {
+  return 'R$' + Math.round(n).toLocaleString('pt-BR');
+}
+function badgeClass(pct) {
+  if (pct >= 30) return 'badge badge-green';
+  if (pct >= 20) return 'badge badge-amber';
+  return 'badge badge-coral';
+}
+
+// ── Sparkline factory ──────────────────────────────────────────────────────
+function sparkline(id, data, color) {
+  const ctx = document.getElementById(id).getContext('2d');
+  return new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: MONTHS,
+      datasets: [{ data, borderColor: color, borderWidth: 2, fill: true,
+        backgroundColor: color + '22', tension: 0.4, pointRadius: 0 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { enabled: false } },
+      scales: { x: { display: false }, y: { display: false } },
+    }
+  });
+}
+
+// ── Channel chart ──────────────────────────────────────────────────────────
+let channelChart;
+function buildChannelChart(al, be) {
+  const ctx = document.getElementById('channel-chart').getContext('2d');
+  if (channelChart) channelChart.destroy();
+  channelChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: channelData.labels,
+      datasets: [
+        { label: 'Alimentos', data: al, backgroundColor: '#1e88e5', borderRadius: 4, barPercentage: 0.6 },
+        { label: 'Bebidas',   data: be, backgroundColor: '#00acc1', borderRadius: 4, barPercentage: 0.6 },
+      ]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => ' ' + fmt(ctx.raw)
+          }
+        }
+      },
+      scales: {
+        x: {
+          stacked: false,
+          grid: { color: 'rgba(255,255,255,0.05)' },
+          ticks: { color: '#90a4d4', font: { size: 11 }, callback: v => fmt(v) }
+        },
+        y: { ticks: { color: '#e8eaf6', font: { size: 12 } }, grid: { display: false } }
+      }
+    }
+  });
+}
+
+// ── Supplier table ─────────────────────────────────────────────────────────
+function buildTable(data) {
+  const tbody = document.getElementById('supplier-tbody');
+  const total = { revenue: 0, margin: 0 };
+  data.forEach(d => { total.revenue += d.revenue; total.margin += d.margin; });
+  const totalPct = Math.round(total.margin / total.revenue * 100);
+
+  let html = data.map(d => {
+    const barW = Math.round(d.revenue / total.revenue * 120);
+    return `<tr>
+      <td><span class="check" style="background:${d.color}"></span>${d.name}</td>
+      <td>
+        <span class="bar-mini" style="width:${barW}px;background:${d.color}44;margin-right:6px"></span>
+        ${fmtFull(d.revenue)}
+      </td>
+      <td style="color:#a5d6a7">${fmtFull(d.margin)}</td>
+      <td><span class="${badgeClass(d.pct)}">${d.pct}%</span></td>
+    </tr>`;
+  }).join('');
+
+  html += `<tr>
+    <td>Total</td>
+    <td>${fmtFull(total.revenue)}</td>
+    <td style="color:#a5d6a7">${fmtFull(total.margin)}</td>
+    <td><span class="badge badge-amber">${totalPct}%</span></td>
+  </tr>`;
+
+  tbody.innerHTML = html;
+}
+
+// ── KPI updater ────────────────────────────────────────────────────────────
+function updateKPIs(revData, marData, pctData) {
+  const totalRev = revData.reduce((a,b)=>a+b,0);
+  const totalMar = marData.reduce((a,b)=>a+b,0);
+  const avgPct   = Math.round(totalMar/totalRev*100);
+  const bestRevM = Math.max(...revData);
+  const bestMarM = Math.max(...marData);
+  const bestPctM = Math.max(...pctData);
+  const bestRevIdx = revData.indexOf(bestRevM);
+  const bestMarIdx = marData.indexOf(bestMarM);
+  const bestPctIdx = pctData.indexOf(bestPctM);
+
+  document.getElementById('kpi-revenue').textContent  = fmtFull(totalRev);
+  document.getElementById('kpi-margin').textContent   = fmtFull(totalMar);
+  document.getElementById('kpi-pct').textContent      = avgPct + '%';
+  document.getElementById('kpi-rev-best').textContent = fmtFull(bestRevM);
+  document.getElementById('kpi-mar-best').textContent = fmtFull(bestMarM);
+  document.getElementById('kpi-pct-best').textContent = Math.round(bestPctM) + '%';
+}
+
+// ── Filter logic ───────────────────────────────────────────────────────────
+function applyFilters() {
+  const month    = document.getElementById('filter-month').value;
+  const channel  = document.getElementById('filter-channel').value;
+  const supplier = document.getElementById('filter-supplier').value;
+
+  let revData = [...monthlyRevenue];
+  let marData = [...monthlyMargin];
+  let pctData = [...monthlyPct];
+
+  if (month !== 'all') {
+    const i = parseInt(month) - 1;
+    revData = [revData[i]];
+    marData = [marData[i]];
+    pctData = [pctData[i]];
+  }
+
+  let supData = [...supplierData];
+  if (supplier !== 'all') supData = supData.filter(d => d.name === supplier);
+
+  let alData = [...channelData.alimentos];
+  let beData = [...channelData.bebidas];
+  if (channel !== 'all') {
+    const idx = channelData.labels.indexOf(channel);
+    alData = [alData[idx]];
+    beData = [beData[idx]];
+  }
+
+  updateKPIs(revData, marData, pctData);
+  buildTable(supData);
+  buildChannelChart(alData, beData);
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+sparkline('spark-revenue', monthlyRevenue, '#64b5f6');
+sparkline('spark-margin',  monthlyMargin,  '#80cbc4');
+sparkline('spark-pct',     monthlyPct,     '#f48fb1');
+applyFilters();
+</script>
+</body>
+</html>
